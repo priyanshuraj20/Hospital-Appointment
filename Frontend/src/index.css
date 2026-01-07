@@ -1,0 +1,141 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* =========================
+   BASE LAYER
+========================= */
+@layer base {
+  body {
+    @apply bg-[#f5f7fb] text-gray-800 antialiased;
+  }
+
+  section {
+    @apply py-[90px];
+  }
+}
+
+/* =========================
+   COMPONENTS
+========================= */
+@layer components {
+  /* Container – thoda premium spacing */
+  .container {
+    @apply max-w-full w-[1320px] px-[5rem] mx-auto;
+  }
+
+  /* Buttons – round kam, modern zyada */
+  .btn {
+    @apply bg-primaryColor 
+           py-[12px] px-[28px] 
+           rounded-[12px] 
+           text-white 
+           font-[600] 
+           mt-[32px]
+           transition-all
+           duration-300
+           hover:scale-[1.03]
+           hover:shadow-lg;
+  }
+
+  /* Headings – cleaner, less bulky */
+  .heading {
+    @apply text-[42px] 
+           leading-[52px] 
+           font-[700] 
+           text-headingColor 
+           tracking-tight;
+  }
+
+  /* Paragraphs – softer contrast */
+  .text_para {
+    @apply text-[17px] 
+           leading-[30px] 
+           font-[400] 
+           text-gray-600 
+           mt-[18px];
+  }
+
+  /* Header */
+  .header {
+    @apply bg-[url('./assets/images/mask.png')] 
+           bg-no-repeat 
+           bg-center 
+           bg-cover 
+           w-full 
+           h-[80px];
+  }
+
+  /* Hero section – reduce AI flashy feel */
+  .hero_section {
+    @apply bg-[url('./assets/images/hero-bg.png')] 
+           bg-no-repeat 
+           bg-cover 
+           bg-center
+           relative;
+  }
+
+  /* Soft overlay (premium feel) */
+  .hero_section::after {
+    content: "";
+    @apply absolute inset-0 bg-white/70;
+  }
+
+  .hero_section > * {
+    @apply relative z-10;
+  }
+
+  /* Forms */
+  .form_label {
+    @apply text-gray-600 
+           font-[600] 
+           text-[14px] 
+           leading-7 
+           mb-2;
+  }
+
+  .form_input {
+    @apply text-gray-800 
+           w-full 
+           px-4 
+           py-3 
+           border 
+           border-gray-300
+           rounded-lg
+           focus:outline-none 
+           focus:border-primaryColor 
+           focus:ring-2 
+           focus:ring-primaryColor/20
+           leading-7 
+           placeholder:text-gray-400 
+           text-[15px];
+  }
+}
+
+/* =========================
+   RESPONSIVE
+========================= */
+@media (max-width: 1024px) {
+  .container {
+    @apply w-full px-6;
+  }
+
+  section {
+    @apply py-[60px];
+  }
+}
+
+@media (max-width: 768px) {
+  .heading {
+    @apply text-[26px] leading-[36px];
+  }
+
+  .text_para {
+    @apply text-[15px] leading-7 mt-3;
+  }
+
+  .btn {
+    @apply px-[22px] py-[10px];
+  }
+}
+

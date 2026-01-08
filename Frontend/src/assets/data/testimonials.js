@@ -9,19 +9,19 @@ import patientAvatar from "../../assets/images/patient-avatar.png";
 
 export const testimonials = [
     {
-      name: "Nikhil Kumar",
+      name: "John Doe",
       rating: 5,
       content: "The care and attention I received at this hospital were exceptional. Highly recommend!",
       photo: testImg02
     },
     {
-      name: "Paras",
+      name: "Jane Smith",
       rating: 4,
       content: "The facilities were top-notch, and the staff was very professional and caring.",
       photo: testImg03
     },
     {
-      name: "Vicky Kumar",
+      name: "Robert Johnson",
       rating: 5,
       content: "Excellent service and friendly staff. My experience was beyond satisfactory.",
       photo: testImg04

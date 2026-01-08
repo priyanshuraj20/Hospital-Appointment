@@ -90,6 +90,30 @@ const Home = () => {
         </div>
       </section>
 
+      {/* ================= AI SYMPTOM CHECKER CTA ================= */}
+      <section className="py-[70px] bg-white">
+        <div className="container">
+          <div className="max-w-[900px] mx-auto bg-[#f9fbfc] border rounded-2xl p-8 flex flex-col md:flex-row items-center justify-between gap-6">
+            <div>
+              <h2 className="text-[28px] font-[700] text-headingColor">
+                Not sure which doctor to consult?
+              </h2>
+              <p className="text_para mt-2 max-w-[520px]">
+                Describe your symptoms and our smart assistant will guide you to
+                the right medical specialist — instantly.
+              </p>
+            </div>
+
+            <button
+              onClick={() => navigate("/doctors#ai-checker")}
+              className="btn whitespace-nowrap"
+            >
+              Check Symptoms
+            </button>
+          </div>
+        </div>
+      </section>
+
       {/* ================= QUICK ACTIONS ================= */}
       <section className="py-[90px]">
         <div className="container">
@@ -143,7 +167,7 @@ const Home = () => {
         </div>
       </section>
 
-      {/* ================= KEEP ORIGINAL COMPONENTS ================= */}
+      {/* ================= REST UNCHANGED ================= */}
       <About />
 
       <section>
@@ -158,43 +182,6 @@ const Home = () => {
         </div>
       </section>
 
-      {/* ================= FEATURE ================= */}
-      <section className="py-[90px] bg-[#f9fbfc]">
-        <div className="container grid lg:grid-cols-2 gap-[80px] items-center">
-          <div>
-            <h2 className="heading">
-              Online Consultation <br /> Made Easy
-            </h2>
-            <ul className="mt-6 space-y-3">
-              <li className="text_para">✔ Book appointments online</li>
-              <li className="text_para">✔ Talk to certified doctors</li>
-              <li className="text_para">✔ Save travel time & cost</li>
-            </ul>
-            <Link to="/">
-              <button className="btn mt-8">Get Started</button>
-            </Link>
-          </div>
-
-          <div className="relative">
-            <img src={featureImg} className="w-3/4" alt="" />
-            <div className="absolute bg-white p-4 rounded-xl shadow bottom-[40px] left-[-20px]">
-              <div className="flex items-center gap-2 text-sm font-[600]">
-                Tue, 24 • 10:00 AM
-                <span className="bg-yellowColor px-2 py-1 rounded">
-                  <img src={videoIcon} alt="" />
-                </span>
-              </div>
-              <p className="text-irisBlueColor text-sm mt-1">Consultation</p>
-              <div className="flex gap-2 items-center mt-2">
-                <img src={avatarIcon} alt="" />
-                <span className="font-[700]">Wayne Collins</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ================= REST UNCHANGED ================= */}
       <section className="lg:pt-[60px]">
         <div className="container">
           <h2 className="heading text-center">Our Doctors</h2>

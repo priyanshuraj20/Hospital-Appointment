@@ -9,8 +9,8 @@ import doctorRoute from "./Routes/doctor.js";
 import reviewRoute from "./Routes/review.js";
 import bookingRoute from "./Routes/booking.js";
 import messageRoute from "./Routes/message.js";
-// import aiRoutes from "./Routes/ai.routes.js";
-// import { authenticate } from "./auth/verifyToken.js";
+import aiRoutes from "./Routes/ai.routes.js";
+import { authenticate } from "./auth/verifyToken.js";
 
 
 dotenv.config();
@@ -50,7 +50,7 @@ app.use("/doctors", doctorRoute);
 app.use("/reviews", reviewRoute);
 app.use("/bookings", bookingRoute);
 app.use("/messages", messageRoute);
-// app.use("/api/ai", authenticate, aiRoutes);
+app.use("/api/ai", authenticate, aiRoutes);
 
 
 app.listen(port, () => {

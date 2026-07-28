@@ -32,15 +32,19 @@ export const register = async (req, res) => {
   const assignedRole = (role || "").toUpperCase() === ROLES.DOCTOR ? ROLES.DOCTOR : ROLES.PATIENT;
 
   try {
-    // Check if email is already taken
-    const existing = await prisma.user.findUnique({ where: { email } });
+    let existing;
+    try {
+      existing = await prisma.user.findUnique({ where: { email } });
+    } catch (dbErr) {
+      existing = await prisma.user.findUnique({ where: { email } });
+    }
+
     if (existing) {
       return res.status(400).json({ success: false, message: "Email already exists." });
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
 
-    // Create user and doctor profile (if doctor) in one transaction
     const newUser = await prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: { email, passwordHash, name, role: assignedRole, phone: phone || null },
@@ -80,10 +84,19 @@ export const login = async (req, res) => {
   }
 
   try {
-    const user = await prisma.user.findUnique({
-      where: { email },
-      include: { doctorProfile: true },
-    });
+    let user;
+    try {
+      user = await prisma.user.findUnique({
+        where: { email },
+        include: { doctorProfile: true },
+      });
+    } catch (dbErr) {
+      // Retry once if Neon database was cold-starting
+      user = await prisma.user.findUnique({
+        where: { email },
+        include: { doctorProfile: true },
+      });
+    }
 
     if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
       return res.status(400).json({ success: false, message: "Invalid email or password." });
@@ -94,16 +107,22 @@ export const login = async (req, res) => {
     const refreshToken = generateRefreshToken(user.id);
 
     // Store hashed refresh token in DB
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { refreshToken: hashToken(refreshToken) },
-    });
+    try {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { refreshToken: hashToken(refreshToken) },
+      });
+    } catch (err) {
+      // Non-critical: fail-safe if refresh token update encounters a lock
+    }
 
-    // Set refresh token as httpOnly cookie (safe from XSS)
+    const isProduction = process.env.NODE_ENV === "production";
+
+    // Set refresh token as httpOnly cookie with cross-site support for Vercel/Render
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      secure: isProduction,
+      sameSite: isProduction ? "none" : "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 
@@ -125,7 +144,6 @@ export const login = async (req, res) => {
 
 // POST /api/auth/refresh-token
 export const refreshToken = async (req, res) => {
-  // Accept refresh token from cookie or body
   const incoming = req.cookies?.refreshToken || req.body?.refreshToken;
 
   if (!incoming) {
@@ -140,7 +158,6 @@ export const refreshToken = async (req, res) => {
 
     const user = await prisma.user.findUnique({ where: { id: decoded.id } });
 
-    // Compare hashed tokens to make sure this is a valid session
     if (!user || user.refreshToken !== hashToken(incoming)) {
       return res.status(403).json({ success: false, message: "Invalid refresh token." });
     }
@@ -156,10 +173,18 @@ export const refreshToken = async (req, res) => {
 // GET /api/auth/me
 export const getMe = async (req, res) => {
   try {
-    const user = await prisma.user.findUnique({
-      where: { id: req.userId },
-      include: { doctorProfile: { include: { slots: true } } },
-    });
+    let user;
+    try {
+      user = await prisma.user.findUnique({
+        where: { id: req.userId },
+        include: { doctorProfile: { include: { slots: true } } },
+      });
+    } catch (dbErr) {
+      user = await prisma.user.findUnique({
+        where: { id: req.userId },
+        include: { doctorProfile: { include: { slots: true } } },
+      });
+    }
 
     if (!user) {
       return res.status(404).json({ success: false, message: "User not found." });

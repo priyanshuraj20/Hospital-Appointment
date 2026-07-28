@@ -4,13 +4,6 @@ import { ROLES } from "./constants.js";
 
 export const seedDatabase = async () => {
   try {
-    const existingDoctors = await prisma.user.count({ where: { role: ROLES.DOCTOR } });
-    if (existingDoctors >= 6) {
-      console.log("Database already contains doctor data.");
-      return;
-    }
-
-    console.log("Seeding database with comprehensive doctor & patient profiles...");
     const salt = await bcrypt.genSalt(10);
     const defaultPassword = await bcrypt.hash("password123", salt);
 
@@ -29,7 +22,7 @@ export const seedDatabase = async () => {
       });
     }
 
-    // 2. Comprehensive Doctor List with Local Public Image References
+    // 2. Comprehensive Doctor List with 8 DISTINCT, Unique Professional Unsplash Doctor Headshots
     const mockDoctors = [
       {
         name: "Dr. Ananya Roy",
@@ -39,7 +32,7 @@ export const seedDatabase = async () => {
         experienceYears: 14,
         consultationFee: 900,
         bio: "Senior Consultant Cardiologist specializing in preventive heart health, interventional cardiology, and echocardiography.",
-        photoUrl: "/images/doctors/ananya.png",
+        photoUrl: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=400&q=80",
         slots: [
           { dayOfWeek: "Monday", startTime: "09:00", endTime: "10:00" },
           { dayOfWeek: "Monday", startTime: "10:30", endTime: "11:30" },
@@ -55,7 +48,7 @@ export const seedDatabase = async () => {
         experienceYears: 9,
         consultationFee: 650,
         bio: "Expert dermatologist specializing in clinical skin care, acne treatments, laser therapies, and aesthetic dermatology.",
-        photoUrl: "/images/doctors/vikram.png",
+        photoUrl: "https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=400&q=80",
         slots: [
           { dayOfWeek: "Tuesday", startTime: "10:00", endTime: "11:00" },
           { dayOfWeek: "Thursday", startTime: "15:00", endTime: "16:00" },
@@ -70,7 +63,7 @@ export const seedDatabase = async () => {
         experienceYears: 11,
         consultationFee: 550,
         bio: "Compassionate pediatrician providing child immunization, developmental tracking, and general adolescent care.",
-        photoUrl: "/images/doctors/meera.png",
+        photoUrl: "https://images.unsplash.com/photo-1594824813571-24a69c100d37?auto=format&fit=crop&w=400&q=80",
         slots: [
           { dayOfWeek: "Monday", startTime: "11:00", endTime: "12:00" },
           { dayOfWeek: "Wednesday", startTime: "09:00", endTime: "10:00" },
@@ -85,7 +78,7 @@ export const seedDatabase = async () => {
         experienceYears: 16,
         consultationFee: 1100,
         bio: "Consultant Neurologist focused on headache management, stroke care, epilepsy treatment, and movement disorders.",
-        photoUrl: "/images/doctors/rajesh.png",
+        photoUrl: "https://images.unsplash.com/photo-1537368910025-700350fe46c7?auto=format&fit=crop&w=400&q=80",
         slots: [
           { dayOfWeek: "Tuesday", startTime: "14:00", endTime: "15:00" },
           { dayOfWeek: "Thursday", startTime: "10:00", endTime: "11:00" },
@@ -100,7 +93,7 @@ export const seedDatabase = async () => {
         experienceYears: 13,
         consultationFee: 850,
         bio: "Orthopedic surgeon specializing in joint replacement, sports injury rehabilitation, and arthroscopic surgery.",
-        photoUrl: "/images/doctors/kavita.png",
+        photoUrl: "https://images.unsplash.com/photo-1651008376811-b90baee60c1f?auto=format&fit=crop&w=400&q=80",
         slots: [
           { dayOfWeek: "Monday", startTime: "15:00", endTime: "16:00" },
           { dayOfWeek: "Wednesday", startTime: "11:00", endTime: "12:00" },
@@ -115,7 +108,7 @@ export const seedDatabase = async () => {
         experienceYears: 10,
         consultationFee: 500,
         bio: "Internal medicine consultant providing routine health checks, fever management, diabetes control, and lifestyle advice.",
-        photoUrl: "/images/doctors/arjun.png",
+        photoUrl: "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?auto=format&fit=crop&w=400&q=80",
         slots: [
           { dayOfWeek: "Monday", startTime: "08:30", endTime: "09:30" },
           { dayOfWeek: "Tuesday", startTime: "09:00", endTime: "10:00" },
@@ -132,7 +125,7 @@ export const seedDatabase = async () => {
         experienceYears: 7,
         consultationFee: 750,
         bio: "Clinical cardiologist specializing in hypertension management, arrhythmia treatment, and non-invasive cardiac care.",
-        photoUrl: "/images/doctors/sneha.png",
+        photoUrl: "https://images.unsplash.com/photo-1527613426441-4da17471b66d?auto=format&fit=crop&w=400&q=80",
         slots: [
           { dayOfWeek: "Tuesday", startTime: "11:00", endTime: "12:00" },
           { dayOfWeek: "Thursday", startTime: "14:00", endTime: "15:00" },
@@ -146,7 +139,7 @@ export const seedDatabase = async () => {
         experienceYears: 12,
         consultationFee: 700,
         bio: "Dermatologist and hair care specialist specializing in trichology, psoriasis management, and pediatric skin ailments.",
-        photoUrl: "/images/doctors/rohan.png",
+        photoUrl: "https://images.unsplash.com/photo-1582750433449-648ed127bb54?auto=format&fit=crop&w=400&q=80",
         slots: [
           { dayOfWeek: "Monday", startTime: "14:00", endTime: "15:00" },
           { dayOfWeek: "Wednesday", startTime: "10:00", endTime: "11:00" },
@@ -158,7 +151,7 @@ export const seedDatabase = async () => {
     for (const doc of mockDoctors) {
       const existing = await prisma.user.findUnique({ where: { email: doc.email } });
       if (existing) {
-        // Update photoUrl if existing
+        // Always update doctor profile photoUrl with the distinct image URL
         const doctorProfile = await prisma.doctorProfile.findUnique({ where: { userId: existing.id } });
         if (doctorProfile) {
           await prisma.doctorProfile.update({
@@ -194,7 +187,7 @@ export const seedDatabase = async () => {
       });
     }
 
-    console.log("Comprehensive doctor data with local image paths seeded successfully.");
+    console.log("Seeding: All 8 doctors updated with unique Unsplash portraits.");
   } catch (error) {
     console.error("Seeding Error:", error);
   }

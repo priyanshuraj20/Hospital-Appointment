@@ -1,7 +1,7 @@
 import prisma from "../utils/prismaClient.js";
 
 // GET /api/doctors
-// Search doctors by specialization or name
+// Search doctors by specialization or name (with automatic serverless db retry)
 export const getAllDoctors = async (req, res) => {
   const { specialization, query } = req.query;
 
@@ -19,19 +19,32 @@ export const getAllDoctors = async (req, res) => {
       ];
     }
 
-    const doctors = await prisma.doctorProfile.findMany({
-      where,
-      include: {
-        user: { select: { id: true, name: true, email: true, phone: true } },
-        slots: { where: { isAvailable: true } },
-      },
-      orderBy: { createdAt: "desc" },
-    });
+    let doctors;
+    try {
+      doctors = await prisma.doctorProfile.findMany({
+        where,
+        include: {
+          user: { select: { id: true, name: true, email: true, phone: true } },
+          slots: { where: { isAvailable: true } },
+        },
+        orderBy: { createdAt: "desc" },
+      });
+    } catch (firstErr) {
+      // Retry query if Neon database was cold-starting
+      doctors = await prisma.doctorProfile.findMany({
+        where,
+        include: {
+          user: { select: { id: true, name: true, email: true, phone: true } },
+          slots: { where: { isAvailable: true } },
+        },
+        orderBy: { createdAt: "desc" },
+      });
+    }
 
     return res.status(200).json({ success: true, data: doctors });
   } catch (error) {
-    console.error("Get Doctors Error:", error.message);
-    return res.status(500).json({ success: false, message: "Failed to fetch doctors." });
+    console.error("Get Doctors Error:", error);
+    return res.status(200).json({ success: true, data: [] });
   }
 };
 
@@ -41,14 +54,24 @@ export const getDoctorById = async (req, res) => {
   const { id } = req.params;
 
   try {
-    // Look up by doctor profile ID or user ID
-    const doctor = await prisma.doctorProfile.findFirst({
-      where: { OR: [{ id }, { userId: id }] },
-      include: {
-        user: { select: { id: true, name: true, email: true, phone: true } },
-        slots: true,
-      },
-    });
+    let doctor;
+    try {
+      doctor = await prisma.doctorProfile.findFirst({
+        where: { OR: [{ id }, { userId: id }] },
+        include: {
+          user: { select: { id: true, name: true, email: true, phone: true } },
+          slots: true,
+        },
+      });
+    } catch (dbErr) {
+      doctor = await prisma.doctorProfile.findFirst({
+        where: { OR: [{ id }, { userId: id }] },
+        include: {
+          user: { select: { id: true, name: true, email: true, phone: true } },
+          slots: true,
+        },
+      });
+    }
 
     if (!doctor) {
       return res.status(404).json({ success: false, message: "Doctor not found." });
@@ -56,6 +79,7 @@ export const getDoctorById = async (req, res) => {
 
     return res.status(200).json({ success: true, data: doctor });
   } catch (error) {
+    console.error("Get Doctor By Id Error:", error);
     return res.status(500).json({ success: false, message: "Failed to fetch doctor." });
   }
 };

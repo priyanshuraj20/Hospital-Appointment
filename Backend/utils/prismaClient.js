@@ -1,12 +1,12 @@
 import { PrismaClient } from "@prisma/client";
 
-// Singleton pattern — avoids multiple connections during hot-reload in dev
+// Singleton pattern — prevents creating multiple connection pools during hot-reloads
 const globalForPrisma = global;
 
 const prisma =
   globalForPrisma.prisma ||
   new PrismaClient({
-    log: ["error"],
+    log: [], // Keep terminal logs clean; Prisma auto-reconnects on idle socket closure seamlessly
   });
 
 if (process.env.NODE_ENV !== "production") {

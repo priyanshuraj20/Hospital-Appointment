@@ -15,29 +15,31 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 5000;
 
-// -- CORS Setup --
-// Only allow requests from our frontend domains
-const allowedOrigins = [
-  "http://localhost:5173",
-  "http://localhost:3000",
-  process.env.CLIENT_SITE_URL
-    ? process.env.CLIENT_SITE_URL.trim().replace(/\/$/, "")
-    : null,
-].filter(Boolean);
-
+// -- Bulletproof CORS Setup --
 app.use(
   cors({
     origin: (origin, callback) => {
       // Allow server-to-server calls (no origin header)
       if (!origin) return callback(null, true);
 
-      const normalized = origin.trim().replace(/\/$/, "");
+      const normalized = origin.trim().replace(/\/$/, "").toLowerCase();
+      const configuredClient = process.env.CLIENT_SITE_URL
+        ? process.env.CLIENT_SITE_URL.trim().replace(/\/$/, "").toLowerCase()
+        : "";
 
-      if (allowedOrigins.includes(normalized) || process.env.NODE_ENV !== "production") {
+      // Check if origin matches allowed domains
+      const isAllowed =
+        normalized.endsWith(".vercel.app") ||
+        normalized.includes("localhost") ||
+        normalized.includes("127.0.0.1") ||
+        (configuredClient && (normalized === configuredClient || normalized.startsWith(configuredClient))) ||
+        process.env.NODE_ENV !== "production";
+
+      if (isAllowed) {
         return callback(null, true);
       }
 
-      return callback(new Error("CORS policy violation: Origin not allowed."));
+      return callback(null, false);
     },
     credentials: true,
   })
@@ -66,9 +68,6 @@ app.use((req, res) => {
 
 // -- Global Error Handler --
 app.use((err, req, res, next) => {
-  if (err.message?.includes("CORS policy violation")) {
-    return res.status(403).json({ success: false, message: err.message });
-  }
   console.error("Server Error:", err.message);
   res.status(500).json({ success: false, message: "Internal Server Error" });
 });

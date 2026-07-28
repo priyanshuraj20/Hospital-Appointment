@@ -4,10 +4,19 @@ import { Navigate } from "react-router-dom";
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const { token, role } = useContext(authContext);
-  const isAllowed = allowedRoles.includes(role);
-  const accessibleRoute =
-    token && isAllowed ? children : <Navigate to="/login" replace={true} />;
-  return accessibleRoute;
+  
+  if (!token) {
+    return <Navigate to="/login" replace={true} />;
+  }
+
+  const userRole = (role || "").toUpperCase();
+  const normalizedAllowed = allowedRoles.map((r) => r.toUpperCase());
+
+  if (!normalizedAllowed.includes(userRole)) {
+    return <Navigate to="/login" replace={true} />;
+  }
+
+  return children;
 };
 
 export default ProtectedRoute;

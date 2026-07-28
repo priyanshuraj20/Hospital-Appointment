@@ -1,37 +1,29 @@
 {
-  "engines": {
-    "node": "20.11.0"
-  },
-  "name": "medicare-booking",
+  "name": "healthbridge-api",
   "version": "1.0.0",
-  "description": "A full stack project for the management of hospitals",
+  "description": "Clean Healthcare Appointment & Payment API",
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node index.js",
-    "start-dev": "nodemon index.js",
-    "build": "npx prisma generate"
+    "dev": "nodemon index.js",
+    "prisma:generate": "prisma generate",
+    "prisma:push": "prisma db push",
+    "seed": "node utils/seeder.js"
   },
-  "author": "Naman",
-  "license": "ISC",
   "dependencies": {
     "@prisma/client": "^5.22.0",
-    "ajv": "^6.12.3",
     "bcryptjs": "^2.4.3",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
     "express": "^4.19.2",
     "jsonwebtoken": "^9.0.0",
-    "lodash": "^4.17.12",
     "nodemailer": "^9.0.3",
-    "qs": "^6.5.3",
-    "stripe": "^16.2.0",
-    "url-parse": "^1.5.0",
-    "ws": "^6.2.2"
+    "razorpay": "^2.9.4"
   },
   "devDependencies": {
+    "nodemon": "^3.1.0",
     "prisma": "^5.22.0"
   }
 }

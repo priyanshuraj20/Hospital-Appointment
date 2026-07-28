@@ -1,54 +1,60 @@
 import jwt from "jsonwebtoken";
 import prisma from "../utils/prismaClient.js";
 
+// Verify the JWT access token from request header or cookie
 export const authenticate = async (req, res, next) => {
-  const authToken = req.headers.authorization;
+  let token = null;
 
-  if (!authToken || !authToken.startsWith("Bearer")) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Authorization denied" });
+  // Check Authorization header first, then fall back to cookie
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    token = authHeader.split(" ")[1];
+  } else if (req.cookies?.token) {
+    token = req.cookies.token;
+  }
+
+  if (!token) {
+    return res.status(401).json({ success: false, message: "No token provided." });
   }
 
   try {
-    const token = authToken.split(" ")[1];
     const decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
     req.userId = decoded.id;
-    req.role = decoded.role;
-    req.hospital = decoded.hospital || null;
-
+    req.userRole = decoded.role;
     next();
-  } catch (err) {
-    if (err === "TokenExpiredError") {
-      return res.status(401).json({ message: "Token is expired" });
+  } catch (error) {
+    if (error.name === "TokenExpiredError") {
+      return res.status(401).json({ success: false, message: "Token expired." });
     }
-    return res.status(401).json({ success: false, message: "You are not authorized" });
+    return res.status(401).json({ success: false, message: "Invalid token." });
   }
 };
 
-export const restrict = (roles) => async (req, res, next) => {
-  const userId = req.userId;
+// Check if the logged-in user has the required role (PATIENT or DOCTOR)
+export const restrict = (allowedRoles = []) => async (req, res, next) => {
   try {
-    // Users (patient / org_admin / admin / receptionist / lab_tech) carry an explicit role column.
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    let role = user?.role;
+    const user = await prisma.user.findUnique({
+      where: { id: req.userId },
+      select: { id: true, role: true, doctorProfile: { select: { id: true } } },
+    });
 
-    // Doctors live in their own table and have an implicit "doctor" role.
     if (!user) {
-      const doctor = await prisma.doctor.findUnique({ where: { id: userId } });
-      if (doctor) role = "doctor";
+      return res.status(401).json({ success: false, message: "User not found." });
     }
 
-    if (!role || !roles.includes(role)) {
-      return res
-        .status(401)
-        .json({ success: false, message: "You are not authorized" });
+    const normalizedRoles = allowedRoles.map((r) => r.toUpperCase());
+    if (!normalizedRoles.includes(user.role.toUpperCase())) {
+      return res.status(403).json({ success: false, message: "Access denied." });
     }
+
+    // Attach user info and doctor profile ID for IDOR checks later
+    req.user = user;
+    if (user.doctorProfile) {
+      req.doctorId = user.doctorProfile.id;
+    }
+
     next();
-  } catch (err) {
-    return res
-      .status(401)
-      .json({ success: false, message: "You are not authorized" });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: "Authorization check failed." });
   }
 };
-

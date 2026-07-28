@@ -1,224 +1,127 @@
-import { useState, useRef, useContext } from "react";
-import userImg from "../../assets/images/defaultUser.jpg";
-import { NavLink, Link, useNavigate } from "react-router-dom";
-import { BiMenu, BiX, BiSearch, BiChevronRight } from "react-icons/bi";
+import { useState, useContext } from "react";
+import { Link, NavLink, useNavigate } from "react-router-dom";
+import { BiMenu, BiX } from "react-icons/bi";
 import { authContext } from "../../context/AuthContext.jsx";
-import { t } from "../../utils/translate.js";
-
-const navLinks = [
-  { path: "/home",         display: "Home" },
-  { path: "/doctors",      display: "Find Hospitals" },
-  { path: "/video-call",   display: "Telemedicine" },
-  { path: "/affordability",display: "Affordability" },
-  { path: "/ai-guides",    display: "AI Assistant" },
-  { path: "/contact",      display: "Contact" },
-];
+import userImg from "../../assets/images/defaultUser.jpg";
 
 const Header = () => {
   const navigate = useNavigate();
-  const [searchQuery, setSearchQuery] = useState("");
-  let [menuStatus, setMenuStatus] = useState(false);
-  const [showDropdown, setShowDropdown] = useState(false);
-  const menuRef = useRef(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
   const { user, role, token, dispatch } = useContext(authContext);
 
   const handleLogout = () => {
     dispatch({ type: "LOGOUT" });
-    navigate("/home");
+    navigate("/login");
   };
 
-  const toggleMenu = () => {
-    setMenuStatus(!menuStatus);
-    menuRef.current.classList.toggle("show_menu");
-  };
+  const normalizedRole = (role || "").toUpperCase();
 
-  const handleSearchSubmit = (e) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      navigate(`/doctors?query=${encodeURIComponent(searchQuery.trim())}`);
-      setSearchQuery("");
-    }
+  const getDashboardPath = () => {
+    if (normalizedRole === "DOCTOR") return "/doctor/dashboard";
+    return "/my-appointments";
   };
 
   return (
-    <header className="header flex items-center bg-white shadow-sm h-20">
+    <header className="header flex items-center bg-white shadow-sm h-20 sticky top-0 z-50">
       <div className="container max-w-[1280px] mx-auto px-4">
         <div className="flex justify-between items-center">
-          {/* Working custom SVG logo for HealthBridge */}
-          <div>
-            <Link to="/home" className="flex items-center gap-2.5">
-              <svg
-                className="w-8 h-8 text-primaryColor"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3"
-                ></path>
-              </svg>
-              <div className="flex flex-col">
-                <span className="text-lg font-extrabold text-primaryColor tracking-tight leading-tight">
-                  Health<span className="text-headingColor">Bridge</span>
-                </span>
-                <span className="text-[9px] text-textColor font-medium tracking-wide uppercase leading-none">
-                  AI-powered Access & Care
-                </span>
-              </div>
-            </Link>
-          </div>
+          {/* Logo */}
+          <Link to="/" className="flex items-center gap-2">
+            <svg
+              className="w-8 h-8 text-primaryColor"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3"
+              ></path>
+            </svg>
+            <div className="flex flex-col">
+              <span className="text-xl font-extrabold text-primaryColor tracking-tight leading-tight">
+                Health<span className="text-headingColor">Bridge</span>
+              </span>
+              <span className="text-[10px] text-textColor font-medium tracking-wide uppercase leading-none">
+                Appointment & Care Portal
+              </span>
+            </div>
+          </Link>
 
-          {/* Navigation Links */}
-          <div className="navigation" ref={menuRef}>
-            <ul className="menu flex gap-2 lg:gap-5 items-center">
-              {navLinks.map((link, idx) => (
-                <li key={idx}>
-                  <NavLink
-                    to={link.path}
-                    className={(navClass) =>
-                      navClass.isActive
-                        ? "text-primaryColor text-[14px] leading-7 font-[600] whitespace-nowrap"
-                        : "text-textColor text-[14px] leading-7 font-[500] hover:text-primaryColor whitespace-nowrap"
-                    }
-                  >
-                    {t(link.display)}
-                  </NavLink>
-                </li>
-              ))}
-            </ul>
-          </div>
+          {/* Nav Links */}
+          <nav className={`md:flex items-center gap-8 ${menuOpen ? "block absolute top-20 left-0 w-full bg-white p-4 shadow-md md:static md:w-auto md:p-0 md:shadow-none" : "hidden"}`}>
+            <NavLink
+              to="/doctors"
+              className={({ isActive }) =>
+                isActive ? "text-primaryColor font-bold text-sm" : "text-textColor hover:text-primaryColor font-medium text-sm"
+              }
+              onClick={() => setMenuOpen(false)}
+            >
+              Find Doctors
+            </NavLink>
+
+            {token && normalizedRole === "PATIENT" && (
+              <NavLink
+                to="/my-appointments"
+                className={({ isActive }) =>
+                  isActive ? "text-primaryColor font-bold text-sm" : "text-textColor hover:text-primaryColor font-medium text-sm"
+                }
+                onClick={() => setMenuOpen(false)}
+              >
+                My Appointments
+              </NavLink>
+            )}
+
+            {token && normalizedRole === "DOCTOR" && (
+              <NavLink
+                to="/doctor/dashboard"
+                className={({ isActive }) =>
+                  isActive ? "text-primaryColor font-bold text-sm" : "text-textColor hover:text-primaryColor font-medium text-sm"
+                }
+                onClick={() => setMenuOpen(false)}
+              >
+                Doctor Dashboard
+              </NavLink>
+            )}
+          </nav>
 
           {/* Right Action buttons */}
-          <div className="flex items-center gap-2.5 lg:gap-4">
-            
-            {/* Header Search bar */}
-            <form onSubmit={handleSearchSubmit} className="hidden xl:flex items-center gap-2 bg-[#f3f4f6] border border-gray-200 rounded-lg px-3 py-1 focus-within:border-primaryColor transition-all">
-              <BiSearch className="text-gray-400 w-3.5 h-3.5" />
-              <input
-                type="text"
-                placeholder="Search hospitals, treatments..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="bg-transparent text-[11px] text-headingColor focus:outline-none w-36 lg:w-44 font-medium"
-              />
-            </form>
-
-            {token && token !== "null" && token !== "undefined" && user && Object.keys(user).length > 0 ? (
-              <div className="relative z-50">
+          <div className="flex items-center gap-4">
+            {token ? (
+              <div className="relative">
                 <button
-                  onClick={() => setShowDropdown(!showDropdown)}
+                  onClick={() => setDropdownOpen(!dropdownOpen)}
                   className="flex items-center gap-2 focus:outline-none"
                 >
-                  <figure className="w-[35px] h-[35px] rounded-full overflow-hidden border border-primaryColor cursor-pointer">
-                    <img
-                      src={user?.photo || userImg}
-                      alt="userImg"
-                      className="w-full h-full object-cover rounded-full"
-                    />
-                  </figure>
+                  <img
+                    src={user?.photoUrl || userImg}
+                    alt={user?.name || "User Profile"}
+                    className="w-10 h-10 rounded-full object-cover border-2 border-primaryColor"
+                  />
+                  <span className="hidden sm:inline font-bold text-xs text-headingColor">{user?.name || "Account"}</span>
                 </button>
 
-                {showDropdown && (
-                  <div className="absolute right-0 mt-3.5 w-60 bg-white border border-gray-150 rounded-2xl p-4 shadow-xl space-y-3.5 transition-all text-left">
-                    {/* User profile brief */}
-                    <div className="space-y-0.5 border-b pb-2.5">
-                      <p className="font-extrabold text-headingColor text-xs truncate">{user?.name || "Member"}</p>
-                      <p className="text-[10px] text-textColor truncate">{user?.email}</p>
+                {dropdownOpen && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-150 rounded-xl p-3 shadow-xl space-y-2 z-50">
+                    <div className="border-b pb-2">
+                      <p className="font-bold text-xs text-headingColor truncate">{user?.name}</p>
+                      <p className="text-[11px] text-textColor truncate">{user?.email}</p>
                     </div>
 
-                    {/* Navigation */}
-                    <div className="space-y-1.5 text-xs text-textColor font-bold">
-                      <Link
-                        to={`${
-                          role === "org_admin"
-                            ? "/organization/dashboard"
-                            : role === "admin"
-                            ? "/admin/dashboard"
-                            : "/users/profile/me"
-                        }`}
-                        onClick={() => setShowDropdown(false)}
-                        className="flex items-center justify-between p-2 rounded-xl hover:bg-teal-50/50 hover:text-primaryColor transition-all"
-                      >
-                        <span>Dashboard</span>
-                        <BiChevronRight size={16} />
-                      </Link>
-                    </div>
+                    <Link
+                      to={getDashboardPath()}
+                      onClick={() => setDropdownOpen(false)}
+                      className="block text-xs font-semibold text-textColor hover:text-primaryColor py-1"
+                    >
+                      Dashboard
+                    </Link>
 
-                    {/* Bilingual Language Selection */}
-                    <div className="flex items-center justify-between border-t pt-2.5">
-                      <span className="text-[10px] font-bold text-headingColor uppercase tracking-wider">Language</span>
-                      <div className="flex items-center gap-1 bg-gray-100 p-0.5 rounded-full border border-gray-200">
-                        <button
-                          onClick={() => {
-                            localStorage.setItem("lang", "en");
-                            window.location.reload();
-                          }}
-                          className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full transition-all leading-none ${
-                            (localStorage.getItem("lang") || "en") === "en"
-                              ? "bg-primaryColor text-white shadow-sm"
-                              : "text-textColor hover:text-headingColor"
-                          }`}
-                        >
-                          EN
-                        </button>
-                        <button
-                          onClick={() => {
-                            localStorage.setItem("lang", "hi");
-                            window.location.reload();
-                          }}
-                          className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full transition-all leading-none ${
-                            localStorage.getItem("lang") === "hi"
-                              ? "bg-primaryColor text-white shadow-sm"
-                              : "text-textColor hover:text-headingColor"
-                          }`}
-                        >
-                          HI
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Light/Dark Theme Switcher */}
-                    <div className="flex items-center justify-between border-t pt-2.5">
-                      <span className="text-[10px] font-bold text-headingColor uppercase tracking-wider">Theme</span>
-                      <div className="flex items-center gap-1 bg-gray-100 p-0.5 rounded-full border border-gray-200">
-                        <button
-                          onClick={() => {
-                            localStorage.setItem("theme", "light");
-                            document.documentElement.classList.remove("dark");
-                            window.location.reload();
-                          }}
-                          className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full transition-all leading-none ${
-                            (localStorage.getItem("theme") || "light") === "light"
-                              ? "bg-primaryColor text-white shadow-sm"
-                              : "text-textColor hover:text-headingColor"
-                          }`}
-                        >
-                          Light
-                        </button>
-                        <button
-                          onClick={() => {
-                            localStorage.setItem("theme", "dark");
-                            document.documentElement.classList.add("dark");
-                            window.location.reload();
-                          }}
-                          className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full transition-all leading-none ${
-                            localStorage.getItem("theme") === "dark"
-                              ? "bg-primaryColor text-white shadow-sm"
-                              : "text-textColor hover:text-headingColor"
-                          }`}
-                        >
-                          Dark
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Logout Button */}
                     <button
                       onClick={handleLogout}
-                      className="w-full bg-red-50 hover:bg-red-100 text-red-600 text-xs font-extrabold py-2 rounded-xl transition-all text-center mt-2"
+                      className="w-full text-left text-xs font-bold text-red-600 hover:bg-red-50 p-1.5 rounded-lg transition"
                     >
                       Logout
                     </button>
@@ -228,24 +131,21 @@ const Header = () => {
             ) : (
               <div className="flex items-center gap-2">
                 <Link to="/login">
-                  <button className="border border-primaryColor text-primaryColor hover:bg-primaryColor/5 font-extrabold text-[11px] px-5 py-2 rounded-full transition-all leading-none">
+                  <button className="border border-primaryColor text-primaryColor hover:bg-primaryColor/5 font-bold text-xs px-4 py-2 rounded-full transition">
                     Login
                   </button>
                 </Link>
                 <Link to="/signup">
-                  <button className="bg-primaryColor hover:bg-teal-700 text-white font-extrabold text-[11px] px-5 py-2 rounded-full shadow-sm transition-all leading-none">
+                  <button className="bg-primaryColor hover:bg-teal-700 text-white font-bold text-xs px-4 py-2 rounded-full shadow-sm transition">
                     Register
                   </button>
                 </Link>
               </div>
             )}
-            <span className="bar" onClick={toggleMenu}>
-              {!menuStatus ? (
-                <BiMenu className="w-8 h-8 cursor-pointer" />
-              ) : (
-                <BiX className="w-8 h-8 cursor-pointer" />
-              )}
-            </span>
+
+            <button className="md:hidden" onClick={() => setMenuOpen(!menuOpen)}>
+              {menuOpen ? <BiX className="w-7 h-7" /> : <BiMenu className="w-7 h-7" />}
+            </button>
           </div>
         </div>
       </div>

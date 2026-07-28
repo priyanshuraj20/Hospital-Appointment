@@ -1,438 +1,214 @@
-import { BASE_URL } from "../../config";
-import ErrorComponent from "../../components/Error/Error.jsx";
-import Loader from "../../components/Loader/Loading.jsx";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { BiSearch, BiFilterAlt, BiMap, BiStar, BiCalendarCheck } from "react-icons/bi";
-import { FaHospital, FaCheckCircle, FaCrown, FaShieldAlt, FaRegClock, FaDollarSign, FaPhone } from "react-icons/fa";
+import { BASE_URL } from "../../config";
+import Loader from "../../components/Loader/Loading.jsx";
+import ErrorComponent from "../../components/Error/Error.jsx";
+import DoctorAvatar from "../../components/DoctorAvatar.jsx";
+import { BiSearch, BiX } from "react-icons/bi";
 
-// Cover images list for hospitals to make it look highly premium
-const HOSPITAL_IMAGES = [
-  "https://images.unsplash.com/photo-1587351021759-3e566b6af7cc?auto=format&fit=crop&w=600&q=80",
-  "https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&w=600&q=80",
-  "https://images.unsplash.com/photo-1586773860418-d37222d8fce3?auto=format&fit=crop&w=600&q=80",
-  "https://images.unsplash.com/photo-1629909613654-28e377c37b09?auto=format&fit=crop&w=600&q=80"
+const SPECIALIZATIONS = [
+  "All",
+  "Cardiology",
+  "Dermatology",
+  "Pediatrics",
+  "Neurology",
+  "Orthopedics",
+  "General Physician",
 ];
-
-const HospitalCard = ({ hospital, index, userLocation }) => {
-  const navigate = useNavigate();
-  
-  const CITY_COORDS = {
-    delhi: { lat: 28.7041, lng: 77.1025 },
-    mumbai: { lat: 19.0760, lng: 72.8777 },
-    bangalore: { lat: 12.9716, lng: 77.5946 },
-    bengaluru: { lat: 12.9716, lng: 77.5946 },
-    chennai: { lat: 13.0827, lng: 80.2707 },
-    kolkata: { lat: 22.5726, lng: 88.3639 },
-    hyderabad: { lat: 17.3850, lng: 78.4867 },
-    pune: { lat: 18.5204, lng: 73.8567 },
-    ahmedabad: { lat: 23.0225, lng: 72.5714 },
-    "new york": { lat: 40.7128, lng: -74.0060 },
-    london: { lat: 51.5074, lng: -0.1278 },
-    dubai: { lat: 25.2048, lng: 55.2708 },
-    toronto: { lat: 43.6532, lng: -79.3832 },
-    singapore: { lat: 1.3521, lng: 103.8198 },
-    sydney: { lat: -33.8688, lng: 151.2093 },
-  };
-
-  const getHaversineDistance = (lat1, lon1, lat2, lon2) => {
-    const R = 6371; // km
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = 
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-      Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c;
-  };
-
-  const getDynamicDistance = () => {
-    if (!userLocation) return hospital.distance;
-    const cityKey = (hospital.city || "").toLowerCase().trim();
-    const coords = CITY_COORDS[cityKey];
-    if (!coords) return hospital.distance;
-    return parseFloat(getHaversineDistance(userLocation.lat, userLocation.lng, coords.lat, coords.lng).toFixed(1));
-  };
-
-  const computedDistance = getDynamicDistance();
-
-  // Estimate cost range from treatmentCosts array
-  const costs = hospital.treatmentCosts?.map(tc => tc.cost) || [];
-  const minCost = costs.length > 0 ? Math.min(...costs) : 500;
-  const maxCost = costs.length > 0 ? Math.max(...costs) : 15000;
-
-  // specialties & supportedInsurances arrive as comma-separated strings from the API
-  const specialtiesArr = (hospital.specialties || "").split(",").map(s => s.trim()).filter(Boolean);
-  const insurancesArr = (hospital.supportedInsurances || "").split(",").map(s => s.trim()).filter(Boolean);
-
-  // Determine badges
-  const isPremium = hospital.rating >= 4.6;
-  const isGovernment = insurancesArr.some(ins => ins.includes("PM-JAY"));
-  const imgUrl = HOSPITAL_IMAGES[index % HOSPITAL_IMAGES.length];
-
-  return (
-    <div
-      onClick={() => navigate(`/doctors/${hospital.id}`)}
-      className="bg-white border border-gray-150 rounded-2xl overflow-hidden shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all cursor-pointer flex flex-col justify-between group h-full"
-    >
-      <div>
-        {/* Cover Image & Badges */}
-        <div className="h-44 w-full relative bg-gray-100 overflow-hidden">
-          <img 
-            src={imgUrl} 
-            alt={hospital.name} 
-            className="w-full h-full object-cover group-hover:scale-105 transition-all duration-300"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-          
-          <div className="absolute top-3 left-3 flex flex-col gap-1.5">
-            {isPremium && (
-              <span className="bg-amber-500 text-white text-[9px] font-extrabold uppercase px-2.5 py-1 rounded-full flex items-center gap-1 shadow-sm">
-                <FaCrown size={8} /> Premium Partner
-              </span>
-            )}
-            <span className="bg-teal-600 text-white text-[9px] font-extrabold uppercase px-2.5 py-1 rounded-full flex items-center gap-1 shadow-sm w-fit">
-              <FaCheckCircle size={8} /> Verified
-            </span>
-          </div>
-
-          <div className="absolute bottom-3 left-3 right-3 flex justify-between items-center text-white">
-            <span className="text-[10px] font-bold bg-black/40 px-2 py-0.5 rounded backdrop-blur-sm">
-              🏥 {hospital.city}
-            </span>
-            <span className="bg-amber-400 text-slate-900 text-xs px-2.5 py-0.5 rounded-full font-extrabold flex items-center gap-1">
-              ⭐ {hospital.rating}
-            </span>
-          </div>
-        </div>
-
-        {/* Content Body */}
-        <div className="p-5 space-y-3.5">
-          <div>
-            <h3 className="font-extrabold text-headingColor text-base leading-snug group-hover:text-primaryColor transition-all">
-              {hospital.name}
-            </h3>
-            <p className="text-xs text-textColor mt-1 flex items-center gap-1">
-              <BiMap className="text-gray-400" /> {hospital.location || "Clinical Zone"}
-            </p>
-          </div>
-
-          {/* Quick Stats Grid */}
-          <div className="grid grid-cols-2 gap-2.5 bg-gray-50 p-3 rounded-xl border border-gray-100 text-xs text-textColor">
-            <div>
-              <p className="text-[9px] font-bold uppercase tracking-wider text-gray-400">OPD Wait Time</p>
-              <p className="font-extrabold text-headingColor flex items-center gap-1 mt-0.5">
-                <FaRegClock className="text-teal-600" size={10} /> {hospital.waitingTime} mins
-              </p>
-            </div>
-            <div>
-              <p className="text-[9px] font-bold uppercase tracking-wider text-gray-400">Estimated Cost</p>
-              <p className="font-extrabold text-headingColor flex items-center gap-1 mt-0.5">
-                <FaDollarSign className="text-teal-600" size={10} /> ₹{minCost} - ₹{maxCost}
-              </p>
-            </div>
-            <div>
-              <p className="text-[9px] font-bold uppercase tracking-wider text-gray-400">Distance</p>
-              <p className="font-bold text-headingColor mt-0.5">📍 {computedDistance} km away</p>
-            </div>
-            <div>
-              <p className="text-[9px] font-bold uppercase tracking-wider text-gray-400">Emergency</p>
-              <p className="font-bold text-red-600 mt-0.5 uppercase text-[10px]">🚨 24/7 Available</p>
-            </div>
-          </div>
-
-          {/* Insurance Schemes */}
-          <div className="space-y-1">
-            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Supported Insurances</span>
-            <div className="flex flex-wrap gap-1">
-              {insurancesArr.slice(0, 3).map((ins, i) => (
-                <span key={i} className="bg-indigo-50 border border-indigo-100 text-indigo-700 text-[10px] px-2 py-0.5 rounded font-semibold">
-                  {ins}
-                </span>
-              ))}
-              {isGovernment && (
-                <span className="bg-emerald-50 border border-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded font-extrabold">
-                  PM-JAY Accepted
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Specialties list at footer */}
-      <div className="px-5 pb-5 flex flex-wrap gap-1">
-        {specialtiesArr.slice(0, 3).map((spec, i) => (
-          <span key={i} className="bg-gray-100 border text-headingColor text-[10px] px-2.5 py-1 rounded-md font-semibold">
-            {spec}
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-};
 
 const Doctors = () => {
   const navigate = useNavigate();
-  const [query, setQuery] = useState("");
-  const [debounceQuery, setDebounceQuery] = useState("");
-  
-  // Filters
-  const [department, setDepartment] = useState("");
-  const [insurance, setInsurance] = useState("");
-  const [maxDistance, setMaxDistance] = useState("");
-  const [maxWaitTime, setMaxWaitTime] = useState("");
-  const [budget, setBudget] = useState("");
+  const [doctors, setDoctors] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedSpecialization, setSelectedSpecialization] = useState("All");
 
-  const [hospitalsList, setHospitalsList] = useState([]);
-  const [fetchLoading, setFetchLoading] = useState(false);
-  const [fetchError, setFetchError] = useState(null);
-  const [userLocation, setUserLocation] = useState(null);
-
-  useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setUserLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          });
-        },
-        (error) => {
-          console.log("Geolocation error:", error);
-        }
-      );
-    }
-  }, []);
-
-  useEffect(() => {
-    const timeOut = setTimeout(() => {
-      setDebounceQuery(query.trim());
-    }, 500);
-    return () => clearTimeout(timeOut);
-  }, [query]);
-
-  const fetchHospitals = async () => {
-    setFetchLoading(true);
-    setFetchError(null);
+  const fetchDoctors = async () => {
+    setLoading(true);
+    setError(null);
     try {
-      const url = `${BASE_URL}/hospitals/recommendations?query=${encodeURIComponent(debounceQuery)}&specialty=${department}&insurance=${insurance}&maxDistance=${maxDistance}&maxWaitTime=${maxWaitTime}&budget=${budget}`;
+      let url = `${BASE_URL}/doctors`;
+      const params = new URLSearchParams();
+
+      if (selectedSpecialization && selectedSpecialization !== "All") {
+        params.append("specialization", selectedSpecialization);
+      }
+      if (searchQuery.trim()) {
+        params.append("query", searchQuery.trim());
+      }
+
+      if (params.toString()) {
+        url += `?${params.toString()}`;
+      }
+
       const res = await fetch(url);
       const json = await res.json();
-      if (!res.ok) throw new Error(json.message);
-      setHospitalsList(json.data.hospitals || []);
+
+      if (!res.ok) {
+        throw new Error(json.message || "Failed to fetch doctors");
+      }
+
+      setDoctors(json.data || []);
     } catch (err) {
-      setFetchError(err.message || "Failed to load hospitals list");
+      setError(err.message);
     } finally {
-      setFetchLoading(false);
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchHospitals();
-  }, [debounceQuery, department, insurance, maxDistance, maxWaitTime, budget]);
+    fetchDoctors();
+  }, [selectedSpecialization]);
 
-  const handleResetFilters = () => {
-    setQuery("");
-    setDebounceQuery("");
-    setDepartment("");
-    setInsurance("");
-    setMaxDistance("");
-    setMaxWaitTime("");
-    setBudget("");
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    fetchDoctors();
+  };
+
+  const handleClearSearch = () => {
+    setSearchQuery("");
+    fetchDoctors();
   };
 
   return (
-    <div className="bg-gray-50 min-h-screen">
-      {/* Search Header Banner */}
-      <section className="bg-white border-b border-gray-100 py-12 shadow-sm">
-        <div className="container max-w-[1200px] mx-auto px-4 text-center">
-          <span className="inline-block text-[10px] font-extrabold uppercase tracking-widest text-primaryColor bg-teal-50 border border-teal-200 px-3.5 py-1.5 rounded-full mb-3">
-            Hospital Discovery Portal
-          </span>
-          <h2 className="text-3xl font-extrabold text-headingColor">Discover Partner Hospitals & Clinics</h2>
-          <p className="text-textColor text-sm mt-2 max-w-[600px] mx-auto leading-relaxed">
-            Search nearby clinical branches, compare estimated surgery costs side-by-side, verify insurance coverage networks, and monitor real-time ICU beds.
-          </p>
+    <div className="bg-gray-50 min-h-screen py-6">
+      <div className="container max-w-[1200px] mx-auto px-4">
+        {/* Search & Filter Compact Header */}
+        <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm mb-6">
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-4">
+            <div>
+              <h2 className="text-xl font-bold text-headingColor">Doctor Directory</h2>
+              <p className="text-xs text-textColor mt-0.5">Find specialists and schedule appointments</p>
+            </div>
 
-          {/* Advanced Search Panel */}
-          <div className="max-w-[1000px] mx-auto bg-white rounded-2xl shadow-md border border-gray-150 p-5 mt-8 space-y-4">
-            <div className="flex flex-col md:flex-row gap-3">
-              {/* Query input */}
-              <div className="relative flex-1">
-                <BiSearch className="absolute left-3.5 top-3.5 text-gray-400 w-4 h-4" />
+            <form onSubmit={handleSearchSubmit} className="flex gap-2 w-full sm:w-auto">
+              <div className="relative flex-1 sm:w-64">
+                <BiSearch className="absolute left-3 top-2.5 text-gray-400 w-4 h-4" />
                 <input
-                  type="search"
-                  className="py-3 pl-10 pr-4 bg-gray-50 border rounded-xl w-full focus:outline-none focus:border-primaryColor text-xs text-textColor font-medium"
-                  placeholder="Search hospital name, location, surgery name (e.g. Angioplasty)..."
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
+                  type="text"
+                  placeholder="Search doctor by name..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-8 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-none focus:border-primaryColor focus:bg-white"
                 />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={handleClearSearch}
+                    className="absolute right-2.5 top-2.5 text-gray-400 hover:text-headingColor"
+                  >
+                    <BiX className="w-4 h-4" />
+                  </button>
+                )}
               </div>
-              
-              {/* Specialty selection */}
-              <select
-                value={department}
-                onChange={(e) => setDepartment(e.target.value)}
-                className="py-3 px-3 bg-gray-50 border rounded-xl text-xs text-textColor focus:outline-none focus:border-primaryColor font-medium md:w-48 bg-white"
+              <button
+                type="submit"
+                className="bg-primaryColor hover:bg-teal-700 text-white font-bold px-4 py-2 rounded-xl text-xs transition"
               >
-                <option value="">All Specialties</option>
-                <option value="Cardiology">Cardiology</option>
-                <option value="Neurology">Neurology</option>
-                <option value="General Surgery">General Surgery</option>
-                <option value="Pediatrics">Pediatrics</option>
-                <option value="Dermatology">Dermatology</option>
-                <option value="Orthopedics">Orthopedics</option>
-                <option value="Ophthalmology">Ophthalmology</option>
-              </select>
+                Search
+              </button>
+            </form>
+          </div>
 
-              {/* Insurance selector */}
-              <select
-                value={insurance}
-                onChange={(e) => setInsurance(e.target.value)}
-                className="py-3 px-3 bg-gray-50 border rounded-xl text-xs text-textColor focus:outline-none focus:border-primaryColor font-medium md:w-44 bg-white"
+          {/* Specialization Filter Pills */}
+          <div className="flex flex-wrap gap-2 border-t pt-3 border-gray-100">
+            {SPECIALIZATIONS.map((spec) => (
+              <button
+                key={spec}
+                onClick={() => setSelectedSpecialization(spec)}
+                className={`px-3.5 py-1 rounded-full text-xs font-semibold transition ${
+                  selectedSpecialization === spec
+                    ? "bg-primaryColor text-white shadow-sm"
+                    : "bg-gray-100 text-textColor hover:bg-gray-200"
+                }`}
               >
-                <option value="">All Insurances</option>
-                <option value="PM-JAY">Ayushman Bharat (PM-JAY)</option>
-                <option value="Star Health">Star Health</option>
-                <option value="HDFC Ergo">HDFC Ergo</option>
-                <option value="Max Bupa">Max Bupa</option>
-              </select>
-            </div>
-
-            {/* Sub Filters Row */}
-            <div className="flex flex-wrap items-center gap-3 pt-2 text-xs">
-              <span className="text-gray-400 font-bold flex items-center gap-1">
-                <BiFilterAlt /> Filters:
-              </span>
-              
-              {/* Distance Slider */}
-              <select
-                value={maxDistance}
-                onChange={e => setMaxDistance(e.target.value)}
-                className="bg-white border rounded-lg px-2.5 py-1.5 text-[11px] font-bold text-textColor"
-              >
-                <option value="">Distance Range</option>
-                <option value="5">Within 5 km</option>
-                <option value="15">Within 15 km</option>
-                <option value="50">Within 50 km</option>
-              </select>
-
-              {/* Wait Time */}
-              <select
-                value={maxWaitTime}
-                onChange={e => setMaxWaitTime(e.target.value)}
-                className="bg-white border rounded-lg px-2.5 py-1.5 text-[11px] font-bold text-textColor"
-              >
-                <option value="">Wait Time</option>
-                <option value="20">Under 20 mins</option>
-                <option value="45">Under 45 mins</option>
-                <option value="90">Under 90 mins</option>
-              </select>
-
-              {/* Budget / Price Limit */}
-              <select
-                value={budget}
-                onChange={e => setBudget(e.target.value)}
-                className="bg-white border rounded-lg px-2.5 py-1.5 text-[11px] font-bold text-textColor"
-              >
-                <option value="">Treatment Budget</option>
-                <option value="1000">Under ₹1,000</option>
-                <option value="15000">Under ₹15,000</option>
-                <option value="100000">Under ₹1,00,000</option>
-              </select>
-
-              {(department || insurance || maxDistance || maxWaitTime || budget || query) && (
-                <button
-                  onClick={handleResetFilters}
-                  className="text-red-500 hover:text-red-700 font-bold ml-auto hover:underline"
-                >
-                  Clear All Filters
-                </button>
-              )}
-            </div>
+                {spec}
+              </button>
+            ))}
           </div>
         </div>
-      </section>
 
-      {/* Main Results Listing */}
-      <section className="py-12">
-        <div className="container max-w-[1200px] mx-auto px-4">
-          {fetchLoading && <Loader />}
-          {fetchError && <ErrorComponent errMsg={fetchError} />}
+        {/* Doctor Grid */}
+        {loading && <Loader />}
+        {error && <ErrorComponent errMsg={error} />}
 
-          {!fetchLoading && !fetchError && (
-            <>
-              {hospitalsList.length === 0 ? (
-                <div className="text-center max-w-[500px] mx-auto bg-white border border-gray-200 rounded-2xl p-10 shadow-sm">
-                  <FaHospital className="text-gray-300 mx-auto mb-3" size={50} />
-                  <p className="font-extrabold text-headingColor text-base">No Partner Hospitals Found</p>
-                  <p className="text-xs text-textColor mt-1.5 leading-5">
-                    We couldn't find any healthcare centers matching your search parameters. Try expanding your filters or search tags.
-                  </p>
-                  <button
-                    onClick={handleResetFilters}
-                    className="mt-4 bg-primaryColor text-white text-xs font-bold px-5 py-2.5 rounded-xl hover:bg-teal-700 transition-all shadow-sm"
+        {!loading && !error && (
+          <>
+            {doctors.length === 0 ? (
+              <div className="text-center py-10 bg-white rounded-2xl border border-gray-200 p-8 max-w-md mx-auto shadow-sm">
+                <p className="font-bold text-headingColor text-sm">No doctors found matching your search.</p>
+                <p className="text-xs text-textColor mt-1 mb-3">
+                  Try clearing your search query or choosing another specialization.
+                </p>
+                <button
+                  onClick={() => {
+                    setSearchQuery("");
+                    setSelectedSpecialization("All");
+                  }}
+                  className="bg-primaryColor hover:bg-teal-700 text-white text-xs font-bold px-4 py-2 rounded-xl transition"
+                >
+                  Reset Filters
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch">
+                {doctors.map((doc) => (
+                  <div
+                    key={doc.id}
+                    className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition flex flex-col justify-between h-full"
                   >
-                    Reset All Filters
-                  </button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-                  {(() => {
-                    const CITY_COORDS = {
-                      delhi: { lat: 28.7041, lng: 77.1025 },
-                      mumbai: { lat: 19.0760, lng: 72.8777 },
-                      bangalore: { lat: 12.9716, lng: 77.5946 },
-                      bengaluru: { lat: 12.9716, lng: 77.5946 },
-                      chennai: { lat: 13.0827, lng: 80.2707 },
-                      kolkata: { lat: 22.5726, lng: 88.3639 },
-                      hyderabad: { lat: 17.3850, lng: 78.4867 },
-                      pune: { lat: 18.5204, lng: 73.8567 },
-                      ahmedabad: { lat: 23.0225, lng: 72.5714 },
-                      "new york": { lat: 40.7128, lng: -74.0060 },
-                      london: { lat: 51.5074, lng: -0.1278 },
-                      dubai: { lat: 25.2048, lng: 55.2708 },
-                      toronto: { lat: 43.6532, lng: -79.3832 },
-                      singapore: { lat: 1.3521, lng: 103.8198 },
-                      sydney: { lat: -33.8688, lng: 151.2093 },
-                    };
+                    <div>
+                      {/* Avatar & Main Info */}
+                      <div className="flex items-center gap-3.5 mb-3">
+                        <DoctorAvatar
+                          name={doc.user?.name}
+                          photoUrl={doc.photoUrl}
+                          className="w-14 h-14"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <h3 className="font-bold text-headingColor text-sm truncate">{doc.user?.name}</h3>
+                          <span className="inline-block bg-teal-50 text-primaryColor text-[10px] font-bold px-2 py-0.5 rounded-full mt-0.5">
+                            {doc.specialization}
+                          </span>
+                          <p className="text-[11px] text-textColor mt-0.5 truncate">{doc.qualification}</p>
+                        </div>
+                      </div>
 
-                    const getHaversine = (lat1, lon1, lat2, lon2) => {
-                      const R = 6371; // km
-                      const dLat = (lat2 - lat1) * Math.PI / 180;
-                      const dLon = (lon2 - lon1) * Math.PI / 180;
-                      const a = 
-                        Math.sin(dLat/2) * Math.sin(dLat/2) +
-                        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-                        Math.sin(dLon/2) * Math.sin(dLon/2);
-                      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-                      return R * c;
-                    };
+                      {/* Description Clamped to 2 lines */}
+                      <div className="min-h-[2.5rem] mb-3">
+                        <p className="text-xs text-textColor line-clamp-2">
+                          {doc.bio || "Experienced specialist committed to patient wellness and diagnostic care."}
+                        </p>
+                      </div>
 
-                    const sortedList = [...hospitalsList].map(h => {
-                      let dist = h.distance;
-                      if (userLocation) {
-                        const cityKey = (h.city || "").toLowerCase().trim();
-                        const coords = CITY_COORDS[cityKey];
-                        if (coords) {
-                          dist = parseFloat(getHaversine(userLocation.lat, userLocation.lng, coords.lat, coords.lng).toFixed(1));
-                        }
-                      }
-                      return { ...h, tempDistance: dist };
-                    }).sort((a, b) => a.tempDistance - b.tempDistance);
+                      {/* Experience and Fee Aligned on One Row */}
+                      <div className="flex justify-between items-center bg-gray-50 p-3 rounded-xl border border-gray-100 text-xs mb-4">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] text-gray-400 font-bold uppercase">Exp:</span>
+                          <span className="font-bold text-headingColor">{doc.experienceYears} Years</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] text-gray-400 font-bold uppercase">Fee:</span>
+                          <span className="font-bold text-primaryColor">₹{doc.consultationFee}</span>
+                        </div>
+                      </div>
+                    </div>
 
-                    return sortedList.map((h, i) => (
-                      <HospitalCard hospital={h} index={i} key={h.id} userLocation={userLocation} />
-                    ));
-                  })()}
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      </section>
+                    {/* Book Appointment Button Fixed at Card Bottom */}
+                    <button
+                      onClick={() => navigate(`/doctors/${doc.id}`)}
+                      className="w-full bg-primaryColor hover:bg-teal-700 text-white font-bold py-2.5 rounded-xl text-xs transition mt-auto"
+                    >
+                      Book Appointment
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 };

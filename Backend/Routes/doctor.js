@@ -1,21 +1,18 @@
 import express from "express";
-import { updateDoctor, deleteDoctor, getAllDoctors, getSingleDoctor, getDoctorProfile,  getAll, updateDoctorStatus} from "../Controllers/doctorController.js";
+import {
+  getAllDoctors,
+  getDoctorById,
+  addDoctorSlot,
+  deleteDoctorSlot,
+} from "../Controllers/doctorController.js";
 import { authenticate, restrict } from "../auth/verifyToken.js";
+import { ROLES } from "../utils/constants.js";
+
 const router = express.Router();
 
-import reviewRouter from "../Routes/review.js"
-
-//doctor routes
 router.get("/", getAllDoctors);
-router.get("/all", getAll);
-router.get("/:id",getSingleDoctor);
-router.put("/:id", authenticate, restrict(['doctor', 'org_admin']), updateDoctor);
-router.delete("/:id", authenticate, restrict(['doctor', 'org_admin']), deleteDoctor);
-router.get("/profile/me", authenticate ,restrict(['doctor']), getDoctorProfile);
-router.put("/updateStatus/:doctorId", updateDoctorStatus);
-//router.delete("/deleteAccount", authenticate,deleteDoctorAccount);
-
-//review routes
-router.use("/:doctorId/reviews", reviewRouter);
+router.get("/:id", getDoctorById);
+router.post("/slots", authenticate, restrict([ROLES.DOCTOR]), addDoctorSlot);
+router.delete("/slots/:slotId", authenticate, restrict([ROLES.DOCTOR]), deleteDoctorSlot);
 
 export default router;

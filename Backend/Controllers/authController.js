@@ -1,222 +1,173 @@
-import prisma from "../utils/prismaClient.js";
-import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
-import sendEmail from "../utils/sendEmail.js";
+import jwt from "jsonwebtoken";
+import prisma from "../utils/prismaClient.js";
+import { ROLES } from "../utils/constants.js";
 
-const genToken = (user) => {
+// Hash the refresh token before storing in DB (prevents session hijack on DB leak)
+const hashToken = (token) => crypto.createHash("sha256").update(token).digest("hex");
+
+// Generate a short-lived access token (24 hours)
+const generateAccessToken = (userId, role) => {
+  return jwt.sign({ id: userId, role }, process.env.JWT_SECRET_KEY, { expiresIn: "1d" });
+};
+
+// Generate a long-lived refresh token (7 days)
+const generateRefreshToken = (userId) => {
   return jwt.sign(
-    { id: user.id, role: user.role },
-    process.env.JWT_SECRET_KEY,
+    { id: userId },
+    process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET_KEY,
     { expiresIn: "7d" }
   );
 };
 
+// POST /api/auth/register
 export const register = async (req, res) => {
-  const { name, email, password, role, taxId } = req.body;
+  const { email, password, name, role, phone, specialization, qualification, consultationFee } = req.body;
+
+  if (!email || !password || !name) {
+    return res.status(400).json({ success: false, message: "Name, email, and password are required." });
+  }
+
+  const assignedRole = (role || "").toUpperCase() === ROLES.DOCTOR ? ROLES.DOCTOR : ROLES.PATIENT;
+
   try {
-    const existingUser = await prisma.user.findUnique({ where: { email } });
-    if (existingUser) {
-      return res.status(400).json({ message: "Account already exists" });
+    // Check if email is already taken
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) {
+      return res.status(400).json({ success: false, message: "Email already exists." });
     }
 
-    if (!["patient", "org_admin"].includes(role)) {
-      return res.status(400).json({ message: "Invalid role. Register as patient or org_admin." });
-    }
+    const passwordHash = await bcrypt.hash(password, 10);
 
-    const hashPassword = await bcrypt.hash(password, 10);
-
-    if (role === "patient") {
-      await prisma.user.create({
-        data: {
-          email,
-          passwordHash: hashPassword,
-          role: "patient",
-          patient: {
-            create: { name, phone: req.body.phone || null }
-          }
-        }
+    // Create user and doctor profile (if doctor) in one transaction
+    const newUser = await prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: { email, passwordHash, name, role: assignedRole, phone: phone || null },
       });
-    } else if (role === "org_admin") {
-      if (!taxId) {
-        return res.status(400).json({ message: "Tax ID is required for organization registration" });
-      }
-      const existingOrg = await prisma.organization.findUnique({ where: { taxId } });
-      if (existingOrg) {
-        return res.status(400).json({ message: "Organization with this Tax ID already exists" });
-      }
-      await prisma.user.create({
-        data: {
-          email,
-          passwordHash: hashPassword,
-          role: "org_admin",
-          organization: {
-            create: { name, taxId }
-          }
-        }
-      });
-    }
 
-    res.status(200).json({ success: true, message: "Account successfully created" });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message || "Internal server error" });
+      if (assignedRole === ROLES.DOCTOR) {
+        await tx.doctorProfile.create({
+          data: {
+            userId: user.id,
+            specialization: specialization || "General Physician",
+            qualification: qualification || "MBBS",
+            consultationFee: consultationFee ? parseFloat(consultationFee) : 500,
+          },
+        });
+      }
+
+      return user;
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Registration successful.",
+      user: { id: newUser.id, name: newUser.name, email: newUser.email, role: newUser.role },
+    });
+  } catch (error) {
+    console.error("Register Error:", error.message);
+    return res.status(500).json({ success: false, message: "Registration failed." });
   }
 };
 
+// POST /api/auth/login
 export const login = async (req, res) => {
   const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({ success: false, message: "Email and password are required." });
+  }
+
   try {
     const user = await prisma.user.findUnique({
       where: { email },
-      include: { patient: true, organization: { include: { hospitals: true } } }
+      include: { doctorProfile: true },
+    });
+
+    if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
+      return res.status(400).json({ success: false, message: "Invalid email or password." });
+    }
+
+    // Generate tokens
+    const accessToken = generateAccessToken(user.id, user.role);
+    const refreshToken = generateRefreshToken(user.id);
+
+    // Store hashed refresh token in DB
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { refreshToken: hashToken(refreshToken) },
+    });
+
+    // Set refresh token as httpOnly cookie (safe from XSS)
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
+
+    // Remove sensitive fields before sending response
+    const { passwordHash, refreshToken: _, ...safeUser } = user;
+
+    return res.status(200).json({
+      success: true,
+      message: "Login successful.",
+      token: accessToken,
+      data: safeUser,
+      role: user.role,
+    });
+  } catch (error) {
+    console.error("Login Error:", error.message);
+    return res.status(500).json({ success: false, message: "Login failed." });
+  }
+};
+
+// POST /api/auth/refresh-token
+export const refreshToken = async (req, res) => {
+  // Accept refresh token from cookie or body
+  const incoming = req.cookies?.refreshToken || req.body?.refreshToken;
+
+  if (!incoming) {
+    return res.status(401).json({ success: false, message: "Refresh token is required." });
+  }
+
+  try {
+    const decoded = jwt.verify(
+      incoming,
+      process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET_KEY
+    );
+
+    const user = await prisma.user.findUnique({ where: { id: decoded.id } });
+
+    // Compare hashed tokens to make sure this is a valid session
+    if (!user || user.refreshToken !== hashToken(incoming)) {
+      return res.status(403).json({ success: false, message: "Invalid refresh token." });
+    }
+
+    const newAccessToken = generateAccessToken(user.id, user.role);
+
+    return res.status(200).json({ success: true, token: newAccessToken });
+  } catch (error) {
+    return res.status(403).json({ success: false, message: "Refresh token expired or invalid." });
+  }
+};
+
+// GET /api/auth/me
+export const getMe = async (req, res) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.userId },
+      include: { doctorProfile: { include: { slots: true } } },
     });
 
     if (!user) {
-      // Check Doctor table for doctor login
-      const doctor = await prisma.doctor.findUnique({
-        where: { email },
-        include: { hospital: true }
-      });
-      if (!doctor) {
-        return res.status(404).json({ message: "Account not found" });
-      }
-
-      const isPasswordMatch = await bcrypt.compare(password, doctor.passwordHash);
-      if (!isPasswordMatch) {
-        return res.status(400).json({ success: false, message: "Invalid Credentials" });
-      }
-
-      const token = jwt.sign(
-        { id: doctor.id, role: "doctor" },
-        process.env.JWT_SECRET_KEY,
-        { expiresIn: "7d" }
-      );
-      const { passwordHash, ...rest } = doctor;
-
-      return res.status(200).json({
-        success: true,
-        message: "Successfully Logged In",
-        token,
-        data: { ...rest, name: doctor.name },
-        role: "doctor",
-      });
+      return res.status(404).json({ success: false, message: "User not found." });
     }
 
-    const isPasswordMatch = await bcrypt.compare(password, user.passwordHash);
-    if (!isPasswordMatch) {
-      return res.status(400).json({ success: false, message: "Invalid Credentials" });
-    }
-
-    const token = genToken(user);
-    const { passwordHash, ...rest } = user;
-
-    res.status(200).json({
-      success: true,
-      message: "Successfully Logged In",
-      token,
-      data: { ...rest, name: user.patient?.name || user.organization?.name },
-      role: user.role,
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message || "Login failed" });
-  }
-};
-
-export const loginAdmin = async (req, res) => {
-  const { email, password } = req.body;
-  try {
-    const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) return res.status(404).json({ message: "User not found" });
-
-    const isPasswordMatch = await bcrypt.compare(password, user.passwordHash);
-    if (!isPasswordMatch) return res.status(400).json({ status: false, message: "Invalid Credentials" });
-
-    if (user.role !== "admin") {
-      return res.status(403).json({ status: false, message: "Unauthorized access. Admins only." });
-    }
-
-    const token = genToken(user);
-    const { passwordHash, ...rest } = user;
-    res.status(200).json({ success: true, message: "Successfully Logged In as Admin", token, data: rest, role: user.role });
-  } catch (err) {
-    res.status(500).json({ success: false, message: "Admin login failed" });
-  }
-};
-
-export const addAdmin = async (req, res) => {
-  const { email } = req.body;
-  try {
-    const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) return res.status(404).json({ message: "User not found" });
-    if (user.role === "admin") return res.status(200).json({ success: true, message: "Already an admin" });
-
-    const updated = await prisma.user.update({ where: { id: user.id }, data: { role: "admin" } });
-    return res.status(200).json({ success: true, message: "User role updated to admin", data: updated });
+    const { passwordHash, refreshToken, ...safeUser } = user;
+    return res.status(200).json({ success: true, data: safeUser });
   } catch (error) {
-    return res.status(500).json({ success: false, message: "Server error" });
-  }
-};
-
-export const forgotPassword = async (req, res) => {
-  const { email } = req.body;
-  try {
-    let account = await prisma.user.findUnique({ where: { email } });
-    if (!account) {
-      const doctor = await prisma.doctor.findUnique({ where: { email } });
-      if (doctor) {
-        // Handle doctor password reset separately
-        return res.status(200).json({ success: true, message: "Password reset for doctors is managed by the hospital." });
-      }
-      return res.status(404).json({ success: false, message: "Account not found" });
-    }
-
-    const resetToken = crypto.randomBytes(20).toString("hex");
-    const resetPasswordToken = crypto.createHash("sha256").update(resetToken).digest("hex");
-    const resetPasswordExpire = new Date(Date.now() + 30 * 60 * 1000);
-
-    await prisma.user.update({
-      where: { id: account.id },
-      data: { resetPasswordToken, resetPasswordExpire }
-    });
-
-    const resetUrl = `${process.env.CLIENT_SITE_URL || "http://localhost:5173"}/reset-password/${resetToken}`;
-
-    try {
-      await sendEmail({
-        email: account.email,
-        subject: "Password Reset Request",
-        message: `Please click the link below to reset your password:\n\n${resetUrl}\n\nThis link will expire in 30 minutes.`,
-      });
-      res.status(200).json({ success: true, message: "Password reset link sent to your email" });
-    } catch (mailErr) {
-      res.status(200).json({ success: true, message: "Password reset token generated", resetUrl });
-    }
-  } catch (err) {
-    res.status(500).json({ success: false, message: "Internal server error, try again" });
-  }
-};
-
-export const resetPassword = async (req, res) => {
-  const { token } = req.params;
-  const { password } = req.body;
-  try {
-    const resetPasswordToken = crypto.createHash("sha256").update(token).digest("hex");
-    const account = await prisma.user.findFirst({
-      where: { resetPasswordToken, resetPasswordExpire: { gt: new Date() } }
-    });
-
-    if (!account) {
-      return res.status(400).json({ success: false, message: "Invalid or expired reset token" });
-    }
-
-    const hashPassword = await bcrypt.hash(password, 10);
-    await prisma.user.update({
-      where: { id: account.id },
-      data: { passwordHash: hashPassword, resetPasswordToken: null, resetPasswordExpire: null }
-    });
-
-    res.status(200).json({ success: true, message: "Password reset successful" });
-  } catch (err) {
-    res.status(500).json({ success: false, message: "Password reset failed" });
+    return res.status(500).json({ success: false, message: "Failed to fetch profile." });
   }
 };

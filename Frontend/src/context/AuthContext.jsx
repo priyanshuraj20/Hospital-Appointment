@@ -2,25 +2,22 @@
 import { createContext, useEffect, useReducer } from "react";
 
 const getInitialState = () => {
-  const initialState = {
-    user: null,
-    role: null,
-    token: null,
-  };
-
+  let user = null;
   try {
-    const userFromStorage = localStorage.getItem("user");
-    if (userFromStorage) {
-      initialState.user = JSON.parse(userFromStorage);
+    const stored = localStorage.getItem("user");
+    if (stored && stored !== "undefined") {
+      user = JSON.parse(stored);
     }
   } catch (e) {
-    console.error("Failed to parse user from localStorage", e);
+    user = null;
   }
 
-  initialState.role = localStorage.getItem("role") || null;
-  initialState.token = localStorage.getItem("token") || null;
-
-  return initialState;
+  return {
+    user,
+    role: localStorage.getItem("role") || null,
+    token: localStorage.getItem("token") || null,
+    refreshToken: localStorage.getItem("refreshToken") || null,
+  };
 };
 
 const initialState = getInitialState();
@@ -30,23 +27,16 @@ export const authContext = createContext(initialState);
 const authReducer = (state, action) => {
   switch (action.type) {
     case "LOGIN_START":
-      return {
-        user: null,
-        role: null,
-        token: null,
-      };
+      return { user: null, role: null, token: null, refreshToken: null };
     case "LOGIN_SUCCESS":
       return {
         user: action.payload.user,
         token: action.payload.token,
+        refreshToken: action.payload.refreshToken || null,
         role: action.payload.role,
       };
     case "LOGOUT":
-      return {
-        user: null,
-        token: null,
-        role: null,
-      };
+      return { user: null, token: null, refreshToken: null, role: null };
     default:
       return state;
   }
@@ -56,9 +46,29 @@ export const AuthContextProvider = ({ children }) => {
   const [state, dispatch] = useReducer(authReducer, initialState);
 
   useEffect(() => {
-    localStorage.setItem("user", JSON.stringify(state.user));
-    localStorage.setItem("token", state.token);
-    localStorage.setItem("role", state.role);
+    if (state.user) {
+      localStorage.setItem("user", JSON.stringify(state.user));
+    } else {
+      localStorage.removeItem("user");
+    }
+
+    if (state.token) {
+      localStorage.setItem("token", state.token);
+    } else {
+      localStorage.removeItem("token");
+    }
+
+    if (state.refreshToken) {
+      localStorage.setItem("refreshToken", state.refreshToken);
+    } else {
+      localStorage.removeItem("refreshToken");
+    }
+
+    if (state.role) {
+      localStorage.setItem("role", state.role);
+    } else {
+      localStorage.removeItem("role");
+    }
   }, [state]);
 
   return (
@@ -66,6 +76,7 @@ export const AuthContextProvider = ({ children }) => {
       value={{
         user: state.user,
         token: state.token,
+        refreshToken: state.refreshToken,
         role: state.role,
         dispatch,
       }}

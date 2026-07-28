@@ -1,129 +1,275 @@
-# HealthBridge – AI-powered Healthcare Access & Hospital Management Platform
+# 🏥 HealthBridge
 
-HealthBridge is a full-stack, production-quality medical portal designed to resolve transparency in healthcare access. It shifts the paradigm from standard doctor listings to a **hospital-centric network platform**, enabling patients to find partner clinical branches, check live bed status, estimate co-pays, compare generic drug alternatives, verify Ayushman Bharat eligibility, and consult with doctors virtually.
+> A secure healthcare appointment booking platform featuring JWT authentication, Razorpay payment integration, transaction-safe booking, PostgreSQL concurrency protection, and role-based access control.
 
----
+> **Primary Objective**: Secure Appointment Booking with Online Payment and Follow-up Management.
 
-## 🏗️ System Architecture & Data Flow
-
-HealthBridge utilizes a modern, robust, and highly concurrent three-tier architecture:
-
-```
-                  ┌──────────────────────────────┐
-                  │        React Client          │
-                  │   (Vite + Tailwind CSS)      │
-                  └──────────────┬───────────────┘
-                                 │ HTTP / WebSockets
-                                 ▼
-                  ┌──────────────────────────────┐
-                  │      Express API Server      │
-                  │         (Node.js)            │
-                  └──────────────┬───────────────┘
-                                 │ Prisma ORM
-                                 ▼
-                  ┌──────────────────────────────┐
-                  │  Neon Serverless PostgreSQL  │
-                  │     (Database Cluster)       │
-                  └──────────────────────────────┘
-```
-
-### 1. Database & Persistence Layer
-* **Database**: Serverless PostgreSQL hosted on Neon, providing rapid scale-to-zero capabilities and optimized connection pools.
-* **ORM (Prisma)**: Manages schema definitions, relations, and type safety. Optimized using a `connection_limit=3` pool constraint to prevent client starvation errors on serverless database endpoints.
-
-### 2. Client-Side Presentation
-* **Interactive Views**: Built on React.js, compiling to lightweight static assets.
-* **Smooth Inertia**: Employs `locomotive-scroll` for fluid momentum scrolling, controlled via React pathname hook transitions.
-* **Bilingual Localization**: Includes a client translation lookup engine (`translate.js`). Toggling language switches patient interfaces to Hindi, while locking hospital authorization consoles (Doctor & Org Admin dashboards) strictly to English to maintain administrative consistency.
+HealthBridge is a full-stack, single-objective healthcare web application built using **React 18 (Vite), Node.js, Express.js, PostgreSQL (Neon Serverless), Prisma ORM, and Razorpay Payments**.
 
 ---
 
-## 🎥 MVP Video Consultation (Deep Dive)
+## 📸 Application Preview & Visual Flow
 
-Our primary MVP feature is the **Secure HD Video Consultation Rooms** which allows virtual consultations, live prescription updates, and AI-generated clinical summaries.
+### 1. Doctor Directory & Search Page
+Filter specialist doctors by clinical category (Cardiology, Dermatology, Pediatrics, Neurology, Orthopedics, General Physician) with unified local doctor profiles and real-time name search.
 
-```
-┌─────────┐            1. Book Video Consult            ┌────────┐
-│ Patient ├────────────────────────────────────────────►│ Active │
-└─────────┘                                             │ Engine │
-     │                                                  └────┬───┘
-     │ 3. Match / Join Room                                  │ 2. Request WebRTC Tokens
-     ▼                                                       ▼
-┌─────────┐         4. HD Peer-to-Peer Stream           ┌────────┐
-│VideoSDK │◄────────────────────────────────────────────┤Backend │
-└─────────┘                                             └────────┘
-```
-
-### Technical Workflow:
-1. **Booking/Matching**: A patient schedules an online consultation or triggers a **🔴 Emergency Live Consult** on the Telemedicine dashboard.
-2. **Room Creation**: The backend generates a unique `meetingRoom` ID (e.g. `healthbridge-room-395810`).
-3. **Secure Token Generation**: The backend uses its `VIDEOSDK_API_KEY` and `VIDEOSDK_SECRET` to sign custom HMAC-SHA256 JWT tokens. These contain specific permission grants (`allow_join: true`, `allow_mod: true`) tailored to each participant's role (patient/doctor).
-4. **WebRTC Stream Launch**: Both patient and doctor join the room from their dashboards. The frontend loads the VideoSDK `MeetingProvider` with the tokens, establishing a direct peer-to-peer audio-video stream.
-5. **Real-time Prescriptions**: During the call, doctors type and submit generic/branded medicines, which instantly write to the database and update the patient's record timeline.
-6. **AI visit Summaries**: The AI counselor reads call logs and outputs clinical summaries of diagnosis and next steps.
+![Doctor Directory](./Frontend/public/images/screenshots/doctor_directory.png)
 
 ---
 
-## 🌟 Comprehensive Features Blueprint
+### 2. Instant Razorpay Payment Modal
+Secure online checkout powered by Razorpay SDK with HMAC-SHA256 signature verification and automatic payment status updates.
 
-| Feature Module | What It Does (What) | How It Works (Technical Implementation) |
+![Razorpay Payment Successful](./Frontend/public/images/screenshots/payment_success.png)
+
+---
+
+### 3. Patient Bookings & Follow-up Dashboard
+Track appointment status (`CONFIRMED`, `PENDING`, `CANCELLED`), payment receipts (`PAID`, `REFUNDED`), and view clinical prescription notes written by assigned doctors.
+
+![My Appointments Dashboard](./Frontend/public/images/screenshots/my_appointments.png)
+
+---
+
+## ❓ Problem Statement & Solution
+
+### ❌ What fails in traditional healthcare apps?
+1. **Double Bookings**: Two patients booking the exact same time slot at the same millisecond due to unhandled database race conditions.
+2. **Payment Forgery**: Fake client-side payment confirmations when HMAC signatures aren't cross-checked with database order IDs.
+3. **Slot Blocking**: Cancelled appointments permanently locking slots from being re-booked.
+4. **IDOR Vulnerabilities**: Unprotected API routes allowing malicious users to cancel or reschedule other patients' appointments.
+
+### ✅ How HealthBridge solves this:
+* 🛡️ **Zero Double-Bookings**: Active slot checks (`PENDING`, `CONFIRMED`) combined with a native **PostgreSQL Partial Unique Index** `WHERE status IN ('PENDING', 'CONFIRMED')`.
+* 🔓 **Instant Slot Unblocking**: Cancelling an appointment marks `status = 'CANCELLED'`, automatically freeing the time slot for other patients.
+* 💳 **Cryptographic Payment Integrity**: HMAC-SHA256 signature verification + mandatory `appointmentId` cross-checking.
+* ⚡ **Payment Idempotency**: DB `@unique` constraint on `Payment.appointmentId` catches parallel double-clicks and returns existing Razorpay orders safely.
+* 🔒 **IDOR Security**: Strict middleware enforcing `appointment.patientId === req.userId` / `appointment.doctorId === req.doctorId` on every mutation.
+
+---
+
+## 🏗️ End-to-End System Execution Flow
+
+```text
+Patient
+   │
+   ▼
+Login (JWT Auth)
+   │
+   ▼
+Browse Doctors Directory
+   │
+   ▼
+Select Available Time Slot
+   │
+   ▼
+Validate Slot Availability
+   │
+   ▼
+Prisma Atomic Transaction
+   │
+   ▼
+Create Razorpay Payment Order (Idempotent)
+   │
+   ▼
+Complete Online Payment
+   │
+   ▼
+Server-side HMAC Signature Verification
+   │
+   ▼
+Confirm Appointment Status
+   │
+   ▼
+Create / Update Payment Record Ledger
+   │
+   ▼
+Doctor Consultation
+   │
+   ▼
+Clinical Prescription & Follow-up
+```
+
+---
+
+## 🛠️ Tech Stack
+
+| Layer | Technology Used | Purpose |
 | :--- | :--- | :--- |
-| **1. Emergency Telemedicine** | Connects patients instantly with available doctors for high-fever or sudden emergency cases. | `POST /bookings/book-instant` finds online telemedicine doctors, creates pre-confirmed bookings, bypasses payment gateways, and generates room links immediately. |
-| **2. Hospital Discovery** | Lists network partner hospitals and clinics rather than individual doctor lists. | Fetches database records from the `Hospital` model. Clicking a hospital card reveals details where specialty categories filter matching doctors. |
-| **3. Geolocation Sorting** | Sorts hospitals by physical proximity. | Obtains coordinates from the browser Geolocation API and computes GPS distance relative to mapped hospital city coordinates using the **Haversine formula**. |
-| **4. Cost Estimate Auditor** | Compares surgical procedure costs side-by-side. | Parses treatment price ranges across private clinics versus government civil centers, outlining potential patient cost exposure. |
-| **5. Co-Pay Estimator** | Calculates out-of-pocket costs. | Mapped in the database, it applies co-insurance and deductible thresholds based on the patient's insurance provider. |
-| **6. Generic Drug Savings** | Recommends cheaper generic drug equivalents. | Queries the pharmacy database index by active chemical ingredient to discover generic drug equivalents, saving patients 80%+ on prescription costs. |
-| **7. Prescription OCR Scanner** | Digitizes doctor prescriptions from photo uploads. | Passes the Cloudinary file URL to OpenRouter LLM multimodal completions, extracting dosages, notes, and configuring daily reminder schedules. |
-| **8. Ayushman Bharat Portal** | Validates government scheme eligibility. | Evaluates household monthly income and family member constraints against rules loaded from `schemesConfig.json`. |
-| **9. Live Bed Monitor** | Tracks ICU, General, and Private bed vacancies. | Integrates with database-level bed counts updating in real-time on the patient's financial helper dashboard. |
-| **10. Drug-Drug Interactions** | Detects unsafe chemical synergies. | An AI scanner checks potential warnings (such as Warfarin + Aspirin) to avoid drug-drug contraindications. |
-| **11. Family Health Vault** | Multi-profile tracking for dependents. | Mapped to the `Patient` model, allows adding family profiles for consolidated vaccination, booking, and report tracking. |
+| **Frontend** | React 18 (Vite SPA) | Fast, responsive single-page web app |
+| **Styling** | Tailwind CSS | Clean, modern healthcare UI design |
+| **Backend** | Node.js + Express.js | REST API routing & authentication middleware |
+| **Database** | PostgreSQL (Neon Serverless) | Serverless relational database storage |
+| **ORM** | Prisma ORM v5 | Type-safe database queries & migration management |
+| **Auth** | JWT (JSON Web Tokens) | Short-lived Access Token + HttpOnly Refresh Token |
+| **Payments** | Razorpay Node SDK | Online checkout & HMAC signature verification |
 
 ---
 
-## ⚙️ Environment Configurations
+## 🔒 Authentication System (Hybrid Security)
 
-### Backend Setup (`Backend/.env`)
-Create a `.env` file in the `Backend` directory containing:
-```env
-PORT=5000
-DATABASE_URL="postgres://user:password@neon-host/db?sslmode=require&connection_limit=3"
-JWT_SECRET_KEY=healthbridge_jwt_secret_token_key_99
-CLIENT_SITE_URL=http://localhost:5173
-OPENROUTER_API_KEY=your_openrouter_api_key
-OPENROUTER_MODEL=google/gemini-2.5-flash
-VIDEOSDK_API_KEY=your_videosdk_api_key
-VIDEOSDK_SECRET=your_videosdk_secret
-```
+HealthBridge implements a production-grade **Hybrid Authentication Architecture**:
 
-### Frontend Setup (`Frontend/.env`)
-Create a `.env` file in the `Frontend` directory containing:
-```env
-VITE_BACKEND_URL=http://localhost:5000
-VITE_CLOUD_NAME=dnb4jcioy
-VITE_UPLOAD_PRESET=doctor_portal
+* **Access Token**: Short-lived (24h) returned in API responses and attached via `Authorization: Bearer <token>` header for stateless requests.
+* **Refresh Token**: Long-lived (7d) stored in an **`HttpOnly` cookie** to insulate sessions against client-side XSS attacks.
+* **SHA-256 Hashing**: Refresh tokens in PostgreSQL are stored as SHA-256 hashes (`crypto.createHash("sha256")`), preventing session hijacking if the database leaks.
+
+---
+
+## ⚡ Concurrency & Slot Protection
+
+To prevent double-bookings without permanently blocking slots when appointments are cancelled:
+
+1. **Active Slot Query Filter**:
+   ```javascript
+   const existing = await tx.appointment.findFirst({
+     where: {
+       doctorId,
+       appointmentDate: date,
+       timeSlot: slot,
+       status: { in: ['PENDING', 'CONFIRMED'] },
+     },
+   });
+   ```
+2. **PostgreSQL Partial Unique Index**:
+   ```sql
+   CREATE UNIQUE INDEX doctor_active_appointment_slot_idx 
+   ON "Appointment" ("doctorId", "appointmentDate", "timeSlot") 
+   WHERE status IN ('PENDING', 'CONFIRMED');
+   ```
+3. **Slot Recovery**: When an appointment is `CANCELLED`, its status becomes `'CANCELLED'`. The partial index and active query filters ignore it, making the slot **immediately re-bookable**.
+
+---
+
+## 🗄️ Database Schema (6 Normalized Models)
+
+```prisma
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  role         String   // "PATIENT" | "DOCTOR"
+  name         String
+  phone        String?
+  refreshToken String?
+}
+
+model DoctorProfile {
+  id              String @id @default(uuid())
+  userId          String @unique
+  specialization String
+  qualification  String?
+  experienceYears Int
+  consultationFee Float
+  bio             String?
+  photoUrl        String?
+}
+
+model Slot {
+  id          String @id @default(uuid())
+  doctorId    String
+  dayOfWeek   String
+  startTime   String
+  endTime     String
+  isAvailable Boolean @default(true)
+}
+
+model Appointment {
+  id              String   @id @default(uuid())
+  patientId       String
+  doctorId        String
+  appointmentDate DateTime
+  timeSlot        String
+  amount          Float
+  status          String   @default("PENDING")   // PENDING | CONFIRMED | CANCELLED | COMPLETED
+  paymentStatus   String   @default("PENDING")   // PENDING | PAID | FAILED | REFUNDED
+}
+
+model Payment {
+  id                String  @id @default(uuid())
+  appointmentId     String  @unique
+  razorpayOrderId   String  @unique
+  razorpayPaymentId String?
+  razorpaySignature String?
+  amount            Float
+  status            String  @default("PENDING")
+}
+
+model FollowUp {
+  id            String    @id @default(uuid())
+  appointmentId String    @unique
+  patientId     String
+  doctorId      String
+  notes         String
+  prescription  Json?
+  status        String    @default("ACTIVE")    // ACTIVE | INVALIDATED
+}
 ```
 
 ---
 
-## 🚀 Running Locally
+## 📡 Key API Endpoints
 
-### Prerequisite
-Ensure you have **Node.js v18.0.0+** and **npm** installed.
+### Auth (`/api/auth`)
+* `POST /register` — Register Patient or Doctor account
+* `POST /login` — Log in & receive Access Token + HttpOnly Cookie
+* `POST /refresh-token` — Rotate Access & Refresh Tokens
+* `GET /me` — Get current logged-in user profile
 
-### 1. Start the API Server
+### Doctors (`/api/doctors`)
+* `GET /` — Search doctors by name & filter by specialization
+* `GET /:id` — Get doctor profile & available consultation slots
+* `POST /slots` — Add available doctor time slots (Doctor only)
+* `DELETE /slots/:slotId` — Delete consultation time slot (Doctor only)
+
+### Appointments (`/api/appointments`)
+* `POST /book` — Reserve an appointment slot
+* `GET /my-appointments` — Get patient appointment & payment history
+* `GET /doctor-appointments` — Get doctor consultation queue
+* `PUT /cancel/:id` — Cancel appointment & trigger refund transition
+* `PUT /reschedule/:id` — Reschedule appointment to a new date/slot
+* `PATCH /status/:id` — Update consultation status (`CONFIRMED`, `COMPLETED`)
+
+### Payments (`/api/payments`)
+* `POST /create-order` — Create Razorpay order (Idempotent)
+* `POST /verify` — HMAC-SHA256 signature verification & status update
+* `POST /webhook` — Razorpay webhook event listener (`payment.captured`, `order.paid`)
+
+### Follow-ups (`/api/followups`)
+* `POST /create` — Save clinical notes & prescription (Doctor only)
+* `GET /appointment/:appointmentId` — Fetch patient prescription notes
+
+---
+
+## 🚀 Quick Setup & Local Running
+
+### 1. Clone & Backend Setup
 ```bash
 cd Backend
 npm install
-npm run start
+
+# Configure environment variables in .env
+cp .env.example .env
+
+# Run Prisma schema push & seed doctor data
+npx prisma db push
+npm run seed
+
+# Start backend API server
+npm start
 ```
 
-### 2. Start the Frontend Application
+### 2. Frontend Setup
 ```bash
-cd ../Frontend
+cd Frontend
 npm install
+
+# Start Vite dev server
 npm run dev
 ```
+Open [http://localhost:5173](http://localhost:5173) in your browser.
 
-The application will launch locally at `http://localhost:5173`.
+---
+
+### 📄 License
+This project is open source and available under the [MIT License](LICENSE).

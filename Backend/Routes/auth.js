@@ -1,20 +1,12 @@
 import express from "express";
-import {
-  register,
-  login,
-  loginAdmin,
-  addAdmin,
-  forgotPassword,
-  resetPassword,
-} from "../Controllers/authController.js";
+import { register, login, refreshToken, getMe } from "../Controllers/authController.js";
+import { authenticate } from "../auth/verifyToken.js";
 
 const router = express.Router();
 
 router.post("/register", register);
 router.post("/login", login);
-router.post("/admin", loginAdmin);
-router.put("/addAdmin", addAdmin);
-router.post("/forgot-password", forgotPassword);
-router.post("/reset-password/:token", resetPassword);
+router.post("/refresh-token", refreshToken);
+router.get("/me", authenticate, getMe);
 
 export default router;
